@@ -9,15 +9,17 @@ One-time setup:
    verified by the DNS TXT record the portal asks for on marketsdk.com.
 2. A GPG key whose public key is on a key server (`gpg --keyserver keyserver.ubuntu.com --send-keys <id>`).
 
-Each release, build and sign locally, then upload the bundle:
+Each release, build into the local Maven repository, then sign, checksum, and bundle outside the
+clone. The generated build's publish repository carries credentials, which Gradle refuses for a
+`file://` URL, so `publishToMavenLocal` is the route.
 
 ```bash
-# Publish into a local directory laid out as a Maven repository.
-MAVEN_PUBLISH_REGISTRY_URL=file://$PWD/staging MAVEN_USERNAME=x MAVEN_PASSWORD=x ./gradlew publish
-# Sign every artifact.
-cd staging && find . -type f ! -name '*.asc' ! -name '*.md5' ! -name '*.sha1' -exec gpg --armor --detach-sign {} ;
-# Bundle, keeping the directory layout.
-zip -r ../marketsdk-java-1.0.0-bundle.zip .
+./gradlew publishToMavenLocal
+V=1.0.0
+B=$(mktemp -d)/bundle && D=$B/com/marketsdk/marketsdk-java/$V && mkdir -p $D
+cp ~/.m2/repository/com/marketsdk/marketsdk-java/$V/marketsdk-java-$V{.jar,.pom,.module,-sources.jar,-javadoc.jar} $D/
+cd $D && for f in *; do gpg --armor --detach-sign "$f"; md5 -q "$f" > "$f.md5"; shasum -a 1 "$f" | cut -d' ' -f1 > "$f.sha1"; done
+cd $B && zip -qr ~/marketsdk-java-$V-bundle.zip com && echo ~/marketsdk-java-$V-bundle.zip
 ```
 
 Upload the bundle at https://central.sonatype.com/publishing, check the validation result, and
