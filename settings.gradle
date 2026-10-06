@@ -1,0 +1,3 @@
+rootProject.name = 'marketsdk-java'
+
+include 'sample-app'
